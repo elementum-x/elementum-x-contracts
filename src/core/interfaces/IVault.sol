@@ -55,6 +55,24 @@ interface IVault {
         bool _isLong
     ) external view returns (bytes32);
 
+    function canLiquidatePosition(
+        address _account,
+        address _collateralToken,
+        address _indexToken,
+        bool _isLong
+    ) external view returns (bool);
+
+    function forceLiquidatePosition(
+        address _account,
+        address _collateralToken,
+        address _indexToken,
+        bool _isLong,
+        address _liquidator
+    ) external returns (uint256 liquidationReward);
+
+
+
+
     // Pool functions
     function poolAmounts(address _token) external view returns (uint256);
     function reservedAmounts(address _token) external view returns (uint256);

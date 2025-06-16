@@ -24,6 +24,7 @@ contract Vault is ReentrancyGuard, Ownable, IVault {
     // State
     bool public override isInitialized;
     address public override router;
+    address public liquidationEngine;
 
     // Position tracking
     mapping(bytes32 => Position) public positions;
@@ -249,7 +250,23 @@ contract Vault is ReentrancyGuard, Ownable, IVault {
         return _collateralDelta; // Return collateral amount
     }
 
-    // Add to your Vault contract
+    // Liquidation (stub for now)
+    function liquidatePosition(
+        address _account,
+        address _collateralToken,
+        address _indexToken,
+        bool _isLong,
+        address _feeReceiver
+    ) external override {
+        // TODO: Implement liquidation logic
+        revert("Vault: liquidation not implemented yet");
+    }
+
+    // Add to your existing Vault.sol
+
+    /**
+     * @dev Calculate position delta (profit/loss)
+     */
     function getPositionDelta(
         address _account,
         address _collateralToken,
@@ -269,6 +286,8 @@ contract Vault is ReentrancyGuard, Ownable, IVault {
         }
 
         uint256 currentPrice = tokenPrices[_indexToken];
+        require(currentPrice > 0, "Vault: invalid price");
+
         uint256 priceDelta = position.averagePrice > currentPrice
             ? position.averagePrice - currentPrice
             : currentPrice - position.averagePrice;
@@ -282,17 +301,159 @@ contract Vault is ReentrancyGuard, Ownable, IVault {
         }
     }
 
-    // Liquidation (stub for now)
-    function liquidatePosition(
+    /**
+     * @dev Get position leverage ratio
+     */
+    function getPositionLeverage(
+        address _account,
+        address _collateralToken,
+        address _indexToken,
+        bool _isLong
+    ) public view returns (uint256) {
+        bytes32 key = getPositionKey(
+            _account,
+            _collateralToken,
+            _indexToken,
+            _isLong
+        );
+        Position memory position = positions[key];
+
+        if (position.collateral == 0) {
+            return 0;
+        }
+
+        return (position.size * BASIS_POINTS_DIVISOR) / position.collateral;
+    }
+
+    /**
+     * @dev Check if position can be liquidated
+     */
+    function canLiquidatePosition(
+        address _account,
+        address _collateralToken,
+        address _indexToken,
+        bool _isLong
+    ) public view returns (bool) {
+        bytes32 key = getPositionKey(
+            _account,
+            _collateralToken,
+            _indexToken,
+            _isLong
+        );
+        Position memory position = positions[key];
+
+        if (position.size == 0) {
+            return false;
+        }
+
+        (bool hasProfit, uint256 delta) = getPositionDelta(
+            _account,
+            _collateralToken,
+            _indexToken,
+            _isLong
+        );
+
+        uint256 remainingCollateral = position.collateral;
+
+        // If position is losing money, subtract losses from collateral
+        if (!hasProfit) {
+            if (delta >= position.collateral) {
+                return true; // Collateral completely wiped out
+            }
+            remainingCollateral = position.collateral - delta;
+        }
+
+        // Check if leverage exceeds maximum (e.g., 50x = 2% collateral ratio)
+        uint256 maxLeverage = 50 * BASIS_POINTS_DIVISOR; // 50x leverage
+        uint256 minCollateralRatio = BASIS_POINTS_DIVISOR / 50; // 2%
+
+        uint256 collateralRatio = (remainingCollateral * BASIS_POINTS_DIVISOR) /
+            position.size;
+
+        return collateralRatio < minCollateralRatio;
+    }
+
+    /**
+     * @dev Force liquidate a position (callable by liquidation engine)
+     */
+    function forceLiquidatePosition(
         address _account,
         address _collateralToken,
         address _indexToken,
         bool _isLong,
-        address _feeReceiver
-    ) external override {
-        // TODO: Implement liquidation logic
-        revert("Vault: liquidation not implemented yet");
+        address _liquidator
+    ) external returns (uint256 liquidationReward) {
+        require(
+            msg.sender == liquidationEngine,
+            "Vault: only liquidation engine"
+        );
+
+        bytes32 key = getPositionKey(
+            _account,
+            _collateralToken,
+            _indexToken,
+            _isLong
+        );
+        Position storage position = positions[key];
+
+        require(position.size > 0, "Vault: position not found");
+
+        (bool hasProfit, uint256 delta) = getPositionDelta(
+            _account,
+            _collateralToken,
+            _indexToken,
+            _isLong
+        );
+
+        uint256 remainingCollateral = position.collateral;
+        if (!hasProfit && delta < position.collateral) {
+            remainingCollateral = position.collateral - delta;
+        } else if (!hasProfit) {
+            remainingCollateral = 0;
+        }
+
+        // Calculate liquidation reward (5% of remaining collateral)
+        liquidationReward = (remainingCollateral * 500) / BASIS_POINTS_DIVISOR;
+        if (liquidationReward > remainingCollateral) {
+            liquidationReward = remainingCollateral;
+        }
+
+        // Clear the position
+        delete positions[key];
+
+        emit PositionLiquidated(
+            key,
+            _account,
+            _collateralToken,
+            _indexToken,
+            _isLong,
+            position.size,
+            remainingCollateral,
+            liquidationReward,
+            _liquidator
+        );
+
+        return liquidationReward;
     }
+
+    function setLiquidationEngine(
+        address _liquidationEngine
+    ) external onlyOwner {
+        liquidationEngine = _liquidationEngine;
+    }
+
+    // Add new event
+    event PositionLiquidated(
+        bytes32 indexed key,
+        address indexed account,
+        address collateralToken,
+        address indexToken,
+        bool isLong,
+        uint256 size,
+        uint256 remainingCollateral,
+        uint256 liquidationReward,
+        address liquidator
+    );
 }
 
 // DO THIS FIRST

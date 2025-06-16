@@ -20,7 +20,7 @@ contract Position721 is ERC721, ERC721Enumerable, Ownable {
     }
 
     IVault public immutable vault;
-    address public positionManager;
+    mapping(address => bool) public authorizedManagers;
 
     mapping(uint256 => PositionNFTData) public positionData;
     mapping(bytes32 => uint256) public vaultKeyToTokenId;
@@ -36,19 +36,22 @@ contract Position721 is ERC721, ERC721Enumerable, Ownable {
 
     event PositionNFTBurned(uint256 indexed tokenId, bytes32 indexed vaultKey);
 
+    modifier onlyAuthorizedManager() {
+        require(authorizedManagers[msg.sender], "Not authorized manager");
+        _;
+    }
+
     constructor(
         address _vault
     ) ERC721("Elementum-X Positions", "EXP") Ownable(msg.sender) {
         vault = IVault(_vault);
     }
 
-    function setPositionManager(address _positionManager) external onlyOwner {
-        positionManager = _positionManager;
-    }
-
-    modifier onlyPositionManager() {
-        require(msg.sender == positionManager, "Only position manager");
-        _;
+    function setAuthorizedManager(
+        address _manager,
+        bool _authorized
+    ) external onlyOwner {
+        authorizedManagers[_manager] = _authorized;
     }
 
     function mint(
@@ -59,7 +62,7 @@ contract Position721 is ERC721, ERC721Enumerable, Ownable {
         uint256 positionType,
         uint256 expiryTime,
         uint256 protectionStrike
-    ) external onlyPositionManager returns (uint256) {
+    ) external onlyAuthorizedManager returns (uint256) {
         uint256 tokenId = _nextTokenId++;
 
         bytes32 vaultKey = vault.getPositionKey(
@@ -90,7 +93,7 @@ contract Position721 is ERC721, ERC721Enumerable, Ownable {
         return tokenId;
     }
 
-    function burn(uint256 tokenId) external onlyPositionManager {
+    function burn(uint256 tokenId) external onlyAuthorizedManager {
         require(_ownerOf(tokenId) != address(0), "Token doesn't exist");
 
         PositionNFTData memory data = positionData[tokenId];
@@ -163,7 +166,14 @@ contract Position721 is ERC721, ERC721Enumerable, Ownable {
 
         collateralValue = collateral;
         currentValue = size; // Simplified - should include PnL
-        healthRatio = (collateral * 10000) / size; // Basis points
+
+        // Fix division by zero
+        if (size == 0) {
+            healthRatio = 0;
+        } else {
+            healthRatio = (collateral * 10000) / size; // Basis points
+        }
+
         isExpired = data.expiryTime > 0 && block.timestamp >= data.expiryTime;
         positionType = data.positionType;
     }

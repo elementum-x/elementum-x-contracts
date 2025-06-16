@@ -24,7 +24,7 @@ contract Position721Test is Test {
         );
 
         vault.initialize(address(positionManager));
-        positionNFT.setPositionManager(address(positionManager));
+        positionNFT.setAuthorizedManager(address(positionManager), true);
         vault.setPrice(indexToken, 50000 * 10 ** 30);
     }
 
