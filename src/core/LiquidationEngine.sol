@@ -180,48 +180,48 @@ contract LiquidationEngine is Ownable, ReentrancyGuard {
      * @dev Batch liquidate multiple positions (for keepers)
      */
     function liquidatePositions(uint256[] calldata tokenIds) external nonReentrant onlyKeeper {
-    require(tokenIds.length <= maxPositionsPerCall, "Too many positions");
-    
-    for (uint256 i = 0; i < tokenIds.length; i++) {
-        uint256 tokenId = tokenIds[i];
+        require(tokenIds.length <= maxPositionsPerCall, "Too many positions");
         
-        // More detailed logging would go here in a debug version
-        // But since we can't use events in the middle, let's just ensure proper execution
-        
-        if (!_exists(tokenId)) {
-            continue; // Skip non-existent positions
+        for (uint256 i = 0; i < tokenIds.length; i++) {
+            uint256 tokenId = tokenIds[i];
+            
+            // More detailed logging would go here in a debug version
+            // But since we can't use events in the middle, let's just ensure proper execution
+            
+            if (!_exists(tokenId)) {
+                continue; // Skip non-existent positions
+            }
+            
+            (bool canLiquidate,) = canLiquidatePosition(tokenId);
+            if (!canLiquidate) {
+                continue; // Skip healthy positions
+            }
+            
+            // Get position data BEFORE liquidation (since NFT will be burned)
+            address positionOwner = positionNFT.ownerOf(tokenId);
+            
+            (
+                address account,
+                address collateralToken,
+                address indexToken,
+                bool isLong,
+            ) = positionNFT.getPositionBasicInfo(tokenId);
+            
+            // Execute liquidation in vault first
+            uint256 liquidationReward = vault.forceLiquidatePosition(
+                account,
+                collateralToken,
+                indexToken,
+                isLong,
+                msg.sender
+            );
+            
+            // Then burn NFT
+            positionNFT.burn(tokenId);
+            
+            emit PositionLiquidated(tokenId, msg.sender, positionOwner, liquidationReward, "Batch liquidation");
         }
-        
-        (bool canLiquidate,) = canLiquidatePosition(tokenId);
-        if (!canLiquidate) {
-            continue; // Skip healthy positions
-        }
-        
-        // Get position data BEFORE liquidation (since NFT will be burned)
-        address positionOwner = positionNFT.ownerOf(tokenId);
-        
-        (
-            address account,
-            address collateralToken,
-            address indexToken,
-            bool isLong,
-        ) = positionNFT.getPositionBasicInfo(tokenId);
-        
-        // Execute liquidation in vault first
-        uint256 liquidationReward = vault.forceLiquidatePosition(
-            account,
-            collateralToken,
-            indexToken,
-            isLong,
-            msg.sender
-        );
-        
-        // Then burn NFT
-        positionNFT.burn(tokenId);
-        
-        emit PositionLiquidated(tokenId, msg.sender, positionOwner, liquidationReward, "Batch liquidation");
     }
-}
     
     /**
      * @dev Get liquidation info for multiple positions (for UI/monitoring)
