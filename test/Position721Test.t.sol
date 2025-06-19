@@ -34,6 +34,7 @@ contract Position721Test is Test {
             .createHybridPosition(
                 collateralToken,
                 indexToken,
+                100 * 10**30, // $100 collateral
                 1000 * 10 ** 30,
                 true,
                 PositionManager.PositionType.STANDARD,
@@ -66,6 +67,7 @@ contract Position721Test is Test {
         (, uint256 tokenId) = positionManager.createHybridPosition(
             collateralToken,
             indexToken,
+            100 * 10**30, // $100 collateral
             1000 * 10 ** 30,
             true,
             PositionManager.PositionType.STANDARD,
@@ -87,6 +89,7 @@ contract Position721Test is Test {
         (, uint256 tokenId) = positionManager.createHybridPosition(
             collateralToken,
             indexToken,
+            100 * 10**30, // $100 collateral
             1000 * 10 ** 30,
             true,
             PositionManager.PositionType.PROTECTED,

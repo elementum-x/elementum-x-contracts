@@ -50,6 +50,7 @@ contract PositionManager is Ownable, ReentrancyGuard {
     function createHybridPosition(
         address _collateralToken,
         address _indexToken,
+        uint256 _collateralDelta,
         uint256 _sizeDelta,
         bool _isLong,
         PositionType _positionType,
@@ -61,6 +62,7 @@ contract PositionManager is Ownable, ReentrancyGuard {
             msg.sender,
             _collateralToken,
             _indexToken,
+            _collateralDelta,
             _sizeDelta,
             _isLong
         );

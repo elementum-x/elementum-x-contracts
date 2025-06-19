@@ -17,6 +17,7 @@ contract Router {
     function increasePosition(
         address _collateralToken,
         address _indexToken,
+        uint256 _collateralDelta,
         uint256 _sizeDelta,
         bool _isLong
     ) external {
@@ -24,6 +25,7 @@ contract Router {
             msg.sender,
             _collateralToken,
             _indexToken,
+            _collateralDelta,
             _sizeDelta,
             _isLong
         );

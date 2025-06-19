@@ -61,6 +61,19 @@ contract Vault is ReentrancyGuard, Ownable, IVault {
         uint256 fee
     );
 
+    // Add new event
+    event PositionLiquidated(
+        bytes32 indexed key,
+        address indexed account,
+        address collateralToken,
+        address indexToken,
+        bool isLong,
+        uint256 size,
+        uint256 remainingCollateral,
+        uint256 liquidationReward,
+        address liquidator
+    );
+
     constructor() Ownable(msg.sender) {}
 
     function initialize(address _router) external onlyOwner {
@@ -160,6 +173,7 @@ contract Vault is ReentrancyGuard, Ownable, IVault {
         address _account,
         address _collateralToken,
         address _indexToken,
+        uint256 _collateralDelta,
         uint256 _sizeDelta,
         bool _isLong
     ) external override nonReentrant {
@@ -180,22 +194,28 @@ contract Vault is ReentrancyGuard, Ownable, IVault {
         // For new position, set average price
         if (position.size == 0) {
             position.averagePrice = price;
+        } else {
+            // Weighted average: (oldSize * oldPrice + newSize * newPrice) / totalSize
+            position.averagePrice =
+                (position.size * position.averagePrice +
+                    _sizeDelta *
+                    price) /
+                (position.size + _sizeDelta);
         }
 
         // Update position
         position.size += _sizeDelta;
         position.lastIncreasedTime = block.timestamp;
 
-        // Simple collateral handling (assume 1:1 for now)
-        uint256 collateralDelta = _sizeDelta / 10; // 10x leverage assumption
-        position.collateral += collateralDelta;
+        // Update collateral
+        position.collateral += _collateralDelta;
 
         emit IncreasePosition(
             key,
             _account,
             _collateralToken,
             _indexToken,
-            collateralDelta,
+            _collateralDelta,
             _sizeDelta,
             _isLong,
             price,
@@ -442,18 +462,6 @@ contract Vault is ReentrancyGuard, Ownable, IVault {
         liquidationEngine = _liquidationEngine;
     }
 
-    // Add new event
-    event PositionLiquidated(
-        bytes32 indexed key,
-        address indexed account,
-        address collateralToken,
-        address indexToken,
-        bool isLong,
-        uint256 size,
-        uint256 remainingCollateral,
-        uint256 liquidationReward,
-        address liquidator
-    );
 }
 
 // DO THIS FIRST

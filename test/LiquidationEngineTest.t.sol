@@ -77,6 +77,7 @@ contract LiquidationEngineTest is Test {
         (, uint256 tokenId) = positionManager.createHybridPosition(
             collateralToken,
             indexToken,
+            100 * 10**30, // $100 collateral
             1000 * 10 ** 30, // $1000 position
             true, // long
             PositionManager.PositionType.STANDARD,
@@ -168,6 +169,7 @@ contract LiquidationEngineTest is Test {
         (, uint256 tokenId) = positionManager.createHybridPosition(
             collateralToken,
             indexToken,
+            100 * 10**30, // $100 collateral
             1000 * 10 ** 30,
             true,
             PositionManager.PositionType.STANDARD,
@@ -205,6 +207,7 @@ contract LiquidationEngineTest is Test {
         (, uint256 tokenId) = positionManager.createHybridPosition(
             collateralToken,
             indexToken,
+            100 * 10**30, // $100 collateral
             1000 * 10 ** 30,
             true,
             PositionManager.PositionType.EXPIRING,
@@ -262,6 +265,7 @@ contract LiquidationEngineTest is Test {
         (, uint256 tokenId) = positionManager.createHybridPosition(
             collateralToken,
             indexToken,
+            100 * 10**30, // $100 collateral
             1000 * 10**30,
             true,
             PositionManager.PositionType.STANDARD,

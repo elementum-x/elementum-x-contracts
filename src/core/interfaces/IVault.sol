@@ -23,6 +23,7 @@ interface IVault {
         address _account,
         address _collateralToken,
         address _indexToken,
+        uint256 _collateralDelta,
         uint256 _sizeDelta,
         bool _isLong
     ) external;
