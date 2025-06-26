@@ -1,0 +1,43 @@
+type = "directrequest"
+schemaVersion = 1
+name = "Gold Price Fallback Request"
+externalJobID = "3c08e276-ff4d-43ab-bc5e-1ab07d9f5556"
+forwardingAllowed = false
+maxTaskDuration = "15m0s"
+contractAddress = "0xd66e04772Caba41F1ca22aAe7c2f6368987C3E20"
+evmChainID = "11155111"
+minIncomingConfirmations = 1
+minContractPaymentLinkJuels = "100000000000000"
+observationSource = """
+  decode_log [type="ethabidecodelog"
+    abi="OracleRequest(bytes32 indexed specId, address requester, bytes32 requestId, uint256 payment, address callbackAddr, bytes4 callbackFunctionId, uint256 cancelExpiration, uint256 dataVersion, bytes data)"
+    data="$(jobRun.logData)"
+    topics="$(jobRun.logTopics)"
+  ]
+
+    fetch_price [type=http
+      method="POST"
+      url="http://109.199.111.192:8080/"
+      requestData="{\\"id\\": \\"job1\\", \\"data\\": {}}"
+      allowunrestrictednetworkaccess="true"
+    ]
+
+    parse_price [type=jsonparse
+      data="$(fetch_price)"
+      path="data,result"
+    ]
+
+    encode_price [type=ethabiencode
+      abi="(bytes32 requestId, uint256 price)"
+      data="{ \\"requestId\\": $(decode_log.requestId), \\"price\\": $(parse_price) }"
+    ]
+
+    encode_tx    [type="ethabiencode"
+                  abi="fulfillOracleRequest2(bytes32 requestId, uint256 payment, address callbackAddress, bytes4 callbackFunctionId, uint256 expiration, bytes calldata data)"
+                  data="{\\"requestId\\": $(decode_log.requestId), \\"payment\\": $(decode_log.payment), \\"callbackAddress\\": $(decode_log.callbackAddr), \\"callbackFunctionId\\": $(decode_log.callbackFunctionId), \\"expiration\\": $(decode_log.cancelExpiration), \\"data\\": $(encode_price)}"
+                  ]
+
+    submit_tx    [type="ethtx" to="0xd66e04772Caba41F1ca22aAe7c2f6368987C3E20" data="$(encode_tx)"]
+
+    decode_log -> fetch_price -> parse_price -> encode_price -> encode_tx -> submit_tx
+"""
