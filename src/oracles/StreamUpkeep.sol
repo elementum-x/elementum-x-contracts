@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.19;
+pragma solidity ^0.8.19;
 
-import {Common} from "@chainlink/contracts@1.4.0/src/v0.8/llo-feeds/libraries/Common.sol";
-import {StreamsLookupCompatibleInterface} from "@chainlink/contracts@1.4.0/src/v0.8/automation/interfaces/StreamsLookupCompatibleInterface.sol";
-import {ILogAutomation, Log} from "@chainlink/contracts@1.4.0/src/v0.8/automation/interfaces/ILogAutomation.sol";
-import {IRewardManager} from "@chainlink/contracts@1.4.0/src/v0.8/llo-feeds/v0.3.0/interfaces/IRewardManager.sol";
-import {IVerifierFeeManager} from "@chainlink/contracts@1.4.0/src/v0.8/llo-feeds/v0.3.0/interfaces/IVerifierFeeManager.sol";
-import {IERC20} from "@chainlink/contracts@1.4.0/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/interfaces/IERC20.sol";
+import {Common} from "lib/chainlink-brownie-contracts/contracts/src/v0.8/llo-feeds/libraries/Common.sol";
+import {StreamsLookupCompatibleInterface} from "lib/chainlink-brownie-contracts/contracts/src/v0.8/automation/interfaces/StreamsLookupCompatibleInterface.sol";
+import {ILogAutomation, Log} from "lib/chainlink-brownie-contracts/contracts/src/v0.8/automation/interfaces/ILogAutomation.sol";
+import {IRewardManager} from "lib/chainlink-brownie-contracts/contracts/src/v0.8/llo-feeds/v0.3.0/interfaces/IRewardManager.sol";
+import {IVerifierFeeManager} from "lib/chainlink-brownie-contracts/contracts/src/v0.8/llo-feeds/v0.3.0/interfaces/IVerifierFeeManager.sol";
+import {IERC20} from "lib/openzeppelin-contracts/contracts/interfaces/IERC20.sol";
 
 /**
  * THIS IS AN EXAMPLE CONTRACT THAT USES UN-AUDITED CODE FOR DEMONSTRATION PURPOSES.
@@ -109,25 +109,67 @@ contract StreamsUpkeep is ILogAutomation, StreamsLookupCompatibleInterface {
     string public constant DATASTREAMS_QUERYLABEL = "timestamp";
     int192 public lastDecodedPrice;
 
-    // This example reads the ID for the ETH/USD report.
-    // Find a complete list of IDs at https://docs.chain.link/data-streams/crypto-streams.
-    string[] public feedIds = [
-        "0x000359843a543ee2fe414dc14c7e7920ef10f4372990b79d6361cdc0dd1ba782"
-    ];
+    // Dynamic feed IDs array - no longer hardcoded
+    string[] public feedIds;
 
     address public priceOracle;
 
-    constructor(address _verifier, address _priceOracle) {
+    constructor(address _verifier, address _priceOracle, string[] memory _feedIds) {
         verifier = IVerifierProxy(_verifier);
         priceOracle = _priceOracle;
+        feedIds = _feedIds;
+    }
+
+    /**
+     * @notice Set the feed IDs for the streams lookup
+     * @param _feedIds Array of feed IDs to set
+     */
+    function setFeedIds(string[] memory _feedIds) external {
+        feedIds = _feedIds;
+    }
+
+    /**
+     * @notice Add a single feed ID to the existing array
+     * @param _feedId The feed ID to add
+     */
+    function addFeedId(string memory _feedId) external {
+        feedIds.push(_feedId);
+    }
+
+    /**
+     * @notice Remove a feed ID at a specific index
+     * @param _index The index of the feed ID to remove
+     */
+    function removeFeedId(uint256 _index) external {
+        require(_index < feedIds.length, "Index out of bounds");
+        for (uint256 i = _index; i < feedIds.length - 1; i++) {
+            feedIds[i] = feedIds[i + 1];
+        }
+        feedIds.pop();
+    }
+
+    /**
+     * @notice Get all current feed IDs
+     * @return Array of all feed IDs
+     */
+    function getFeedIds() external view returns (string[] memory) {
+        return feedIds;
+    }
+
+    /**
+     * @notice Get the number of feed IDs
+     * @return Number of feed IDs
+     */
+    function getFeedIdsCount() external view returns (uint256) {
+        return feedIds.length;
     }
 
     // This function uses revert to convey call information.
     // See https://eips.ethereum.org/EIPS/eip-3668#rationale for details.
     function checkLog(
         Log calldata log,
-        bytes memory
-    ) external returns (bool upkeepNeeded, bytes memory performData) {
+        bytes memory /* unused */
+    ) external view returns (bool /*upkeepNeeded*/, bytes memory /*performData*/) {
         revert StreamsLookup(
             DATASTREAMS_FEEDLABEL,
             feedIds,
@@ -169,7 +211,7 @@ contract StreamsUpkeep is ILogAutomation, StreamsLookupCompatibleInterface {
     function performUpkeep(bytes calldata performData) external {
         // Decode the performData bytes passed in by CL Automation.
         // This contains the data returned by your implementation in checkCallback().
-        (bytes[] memory signedReports, bytes memory extraData) = abi.decode(
+        (bytes[] memory signedReports, /* bytes memory extraData */) = abi.decode(
             performData,
             (bytes[], bytes)
         );
